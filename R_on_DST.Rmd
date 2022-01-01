@@ -18,7 +18,7 @@ Selected chores make use of functions in the package "heaven" which is made spec
 devtools::install_github("tagteam/heaven").
 ```
 
-Statistics Denmark is a closed environment and all packages available are preinstalled, therefore only library statements are necessary. All packages on CRAN installed on the servers used by us.
+Statistics Denmark is a closed environment and all packages available are pre-installed, therefore only library statements are necessary. All packages on CRAN installed on the servers used by us.
 
 In general there are multiple ways of reaching the target of a project.  The suggestions in this document are not rules to be followed, but reflect experience after many years of working in the particular environment.  Suggestions for improvement are always welcome.
 
@@ -102,7 +102,7 @@ As data are imported to the project it is necessary to check that what You have 
 
 It is generally useful to create small tables to check that your data are what you expect them to be and a very useful procedure is
 
-* object[,.N,by="var1"] which will tabulate the number of records by var1. Tabulation by multiple variables can be done by replacing by=var1 with character vector: by=c("var1","var2"...).
+* **object[,.N,by="var1"]** which will tabulate the number of records by var1. Tabulation by multiple variables can be done by replacing by=var1 with character vector: **by=c("var1","var2"...)**.
 
 # Manipulating data
 This is described using data.table. In this description **DT** represents your data.table object. The general format for manipulating is
@@ -112,6 +112,8 @@ Data.table attemps to limit use of RAM by not making copies of data. If you writ
 
 ## Creating new variables
 A simple new variable examplified by age is created with **DT[,age:=(date-birthdate)/365.25]**. This assumes that both date and birthdate are R dates.
+
+A common target is to make a variable that is the largest or smallst non-missing of several other variables. This is accomplished with **DT[,max:=pmax(var1,var2,var3,na.rm=TRUE)]**.  Beward of the "p" in "pmax" this p dictates that the comparison is made on a record level.
 
 Several variables can be created in one step: **DT[,':='(var1=var3+var4,var5=var2*5)]**
 
@@ -132,6 +134,27 @@ the function **setNames(DT,..)** can be used to name all variables by providing 
 
 Many imported datasets have a confusing attitude to "case" with mixtures of upper case and lower case names. Changing all variables to lower case can be achieved with **names(DT) <- tolower(names(DT))** 
 
+## Selecting a subset of variables
+The most efficient way to select a subset of variables is **DT2 <- DT[,.(var1,var5,var8)]**.  In some circumstances, such as within a function another version is: **DT2 <- DT[,.SD,.SDcols=c(var1,var5,var8)]**.  The variable **.SD** is "sub data.table" and refers to a group of columns in the dataset.
+
+## Subset selection
+If a dataset has been sorted by individual identifier and another variable such as a date, it is common that You want to select jest the first occurrence for each individual. This is done with **DT2 <- DT[,.SD[1],by="individual_identifier"]**.  If You instead want the last occurrence **[1]** is replace by **[.N]** and if You for some reason want the second occurrence the replacement is **[2]**.
+
+If You want to select a subset based on a logical statement, and efficient way is **DT2 <- DT[age<100]**.
+
+In case you want to search for all records that start with a selected string you can use:
+**DT2 <- DT[grepl("^A10",var)]** that finds all records where "var" starts with "A10". This is a very simple example of a "regular expression" which is an extremely versatile tool to search for complicated relation. An overview of regular expressions can be found here: https://stringr.tidyverse.org/articles/regular-expressions.html
+
+It is common to require a number of conditions to be defined each by a range of variable content.  An example is to search for multiple comorbidites which each is defined by a range of diagnosis codes.  A special function **heaven::findCondition** have been developed for this purpose.
+
+To use this function You first need to create a "named list" of (start of/end of) codes for each condition You wish to find. An example of such a list is **heaven::charlsonCodes**. You can also define another exclusion list. This can be useful if You e.g. want to find "all cancer except non melanoma skin cancer".  You an then have "cancer='C'" in the names list of inclusions and in the list of exclusions you have an element "cancer" with the few condition you wish to exclude.
+
+With the one or two named list generated the **heaven::findCondition** will find all occurrences of you selected condition. The examples on the help page also shows how you can manipulate the result further.
+
+
+## Removing variables
+A single variable is removed with **DT[,var1:=NULL]** and a group of variables is removed with **DT[,c("var1","var3"):=NULL]**. Note that no "<-" is necessary, just the vector with the particular variable is removed.
+
 ## Sorting data
 The functions **setkey(DT,"var")** and **setkeyv(DT,c("var1","var2"))** sorts the data in ascending order and creates a key for fast use of the sorted data.
 
@@ -148,7 +171,7 @@ Many chores need to repeated on many variables and example being changing a nume
 vars <- c("var1","var2"...)
 for (x in vars) DT[get(x)==999,(x):=NA]
 ```
-Note two peculiarities here.  If we had written x== instead of get(x)== data.table would not know whether x was an object or representing the loop variable.  get() solves that problem.  Similarly, if we had written x:=NA we would repeatedly create a variable named x - the parenthesis forces the evaluation in this case.
+Note two peculiarities here.  If we had written x== instead of get(x)== data.table would not know whether x was an object or representing the loop variable.  get() solves that problem by enforcing evaluation of x.  Similarly, if we had written x:=NA we would repeatedly create a variable named x - the parenthesis forces the evaluation in this case.
 
 ## Append - rbind
 Combining several data.tables to create one long table can be achived with **rbindlist()** or **rbind()**.  If the only input is a vector of data.table objects then names and order of columns need to match perfectly.  If one tables contains extra variables these columns can be set to NA for the other tables with the option **fill=TRUE**. The option **idcol="file"** adds a column with the name of the object that contributed to each record.
@@ -158,7 +181,57 @@ Combining data.tables by columns as apposed by rows can be achived with **cbind(
 
 if two data.tables have been provided the same key with **setkey** or **setkeyv** then **DT1[DT2]** will generate and **inner merge**, that is a data.table with those records where both data.tables have contributed. An **outer merge** is one where all records from both data.tables are present and NAs are placed where tables do not contribute with data. It is also common that You want one of the data.tables to define which individuals are in the final results and this is achieed by **left and right merge**.  With the **merge** function these variants of merge are achived with **all=TRUE** for outer merge, **all.x=TRUE** for lesf merge and **all.y=TRUE** for right merge. Not adding any of these options results in an inner merge.  As an example of a left merge: **newDT <- merge(DT1,DT2,by="idvar",all.x=TRUE)**
 
-If a whole series of data.tables need to be merged, the simple merge function cannot do it, but it can be achived with the **Reduce()** function. This function requires two parameters - a function and a list. Reduce will perform the function on the first two members of the list, then the result of this is put in the function along with the third member of the list etc. Thus, a left merge where the first member of a list of data.tables defines which individuals are in the final dataset can be made with: **DT <- Reduce(function(x,y){merge(x,y,all.x=TRUE,by="idvar")},list(DT1,DT2,DT3,...))**
+If a whole series of data.tables need to be merged, the simple merge function cannot do it, but it can be achieved with the **Reduce()** function. This function requires two parameters - a function and a list. Reduce will perform the function on the first two members of the list, then the result of this is put in the function along with the third member of the list etc. Thus, a left merge where the first member of a list of data.tables defines which individuals are in the final dataset can be made with: **DT <- Reduce(function(x,y){merge(x,y,all.x=TRUE,by="idvar")},list(DT1,DT2,DT3,...))**
+
+## Summary statistics
+It is common that You need to create datasets that are summary statistics of other datasets.  Data.table has a strong interface for this: **DT2 <- DT[,.(mean=mean(var1),nunmber=length(var1),max=max(var1)),by="grouping_variable"]**. This statement will calculate the mean and the maxfor each level of the grouping variable. In this statement the "." just before the parenthesis is short for "list".  
+
+## Numbering
+
+Numbering records by subgroup of another variable is done with **DT[,number:=1:.N,by=group_variable]**
+
+Numbering groups, that is numbering all levels of one variable, is done with **DT[group_number:=1:.GRP,by=group_variable]**
+
+## Make multiple records
+For some counting purposes it may be a good idea to create multiple records for levels of a selected variable:
+
+```{r}
+library(data.table)
+DT <- data.table(ID=c(1:3),number=c(1,2,3))
+DT[]
+DT[,rownum:=1:.N] # variable indicating row
+DT2 <- DT[,.(ID=ID,newvar=seq(1,number)),by="rownum"] # makes the extra records
+DT2[] # Display the result
+```
+# Specialised functions for data manipulation
+## Matching
+Simple matching can efficiently be performed with the **matchit::matchit** function.  By default is finds "nearest neighbor" which also implies that the nearest neighbor may be far away. You therefore need to tabulate to check the effect of matching.
+
+For survival type problems you will often need to find "risk sets". This implies that you are not only satisfied with finding individuals with e.g. same age and sex, but the controls you find need to be part of the risk set - they have not yet obtained the outcome of interest and they are not dead or have passed end of follow-up.
+
+Risk-set matching comes in two flavors: incidense density matching and exposure density matching. The former is for a case-control type analysis where you match cases at the time of outcome with controls that have not (yet) reached the outcome. The function for this is **heaven::incidenseMatch**.  The other flavor is a cohort type study where you wish to match individuals at the time of an exposure with controls that have not (yet) been exposed - and also have not reached the outcome, death of end of follow-up.  The function for this is **heaven::exposureMatch**.
+## Income
+The function **heaven::averageIncome** is helpful for defining average income over a range of years prior to a selected date
+
+## Education
+
+Education codes on Statistics Denmark are 4-digit numbers.  To convert these into accepted international classes you can merge with the data.table **heaven::edu_code** which has several groupings including ISCED codes. 
+
+## Splitting - Time dependent analysis
+In analyses of time dependent phenomena variables need to be updated to new values as time passes. This is practically handled by splitting. This implies that the record of an individual ends when a conditions changes and then a new record starts at the time of the new condition. Since many conditions can change and both age and calender time with certainty changes the splitting of an individual can result in truly many records for each individual. Three functions have been developed to carry out this task:
+The **heaven::lexisTwo** function can split each record once for each condition - and is typically used for comorbidities where the status of the comorbidity variable is zero prior to the date of the comorbidity and "1" after.  The **heaven::lexisFromTo** function can handle intervals and is typically used for medication where each treatment period is an interval.  Finally **heaven::lexisSeq** can split by vectors and is typically used for a vector of age levels or a vector defining calender time periods.
+
+## Prescriptions to treatment periods
+Medication on Statistics Denmark is provided as prescriptions that are picked up at Danish pharmacies. Provided is date of prescription, number and strength of medication units (pills). The function **heaven::medicinMacro** can transform this list of prescriptions into a list of treatment periods providing start, end and intensity of treatment.  To enable this the user has to provide information on the use of each strength of each medication and other data. This information is provided as named lists.
+
+## Charlson codes
+The function **heaven::charlsonIndex** can provide Charlson Index and individual codes using diagnosis codes and a variable defining the date at which the index should be calculated.
+
+## Hypertension
+The function **heaven::hypertensionMedication** can define the presence of hypertension using medication used for treating hypertension. The function can provide either the presence of hypertension at a specific date or the date at which hypertension appears.
+
+# 
+
 
 
 
