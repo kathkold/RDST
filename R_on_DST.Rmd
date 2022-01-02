@@ -184,13 +184,13 @@ if two data.tables have been provided the same key with **setkey** or **setkeyv*
 If a whole series of data.tables need to be merged, the simple merge function cannot do it, but it can be achieved with the **Reduce()** function. This function requires two parameters - a function and a list. Reduce will perform the function on the first two members of the list, then the result of this is put in the function along with the third member of the list etc. Thus, a left merge where the first member of a list of data.tables defines which individuals are in the final dataset can be made with: **DT <- Reduce(function(x,y){merge(x,y,all.x=TRUE,by="idvar")},list(DT1,DT2,DT3,...))**
 
 ## Summary statistics
-It is common that You need to create datasets that are summary statistics of other datasets.  Data.table has a strong interface for this: **DT2 <- DT[,.(mean=mean(var1),nunmber=length(var1),max=max(var1)),by="grouping_variable"]**. This statement will calculate the mean and the maxfor each level of the grouping variable. In this statement the "." just before the parenthesis is short for "list".  
+It is common that You need to create datasets that are summary statistics of other datasets.  Data.table has a strong interface for this: **DT2 <- DT[,.(mean=mean(var1),nunmber=length(var1), max=max(var1)), by="grouping_variable"]**. This statement will calculate the mean and the maxfor each level of the grouping variable. In this statement the "." just before the parenthesis is short for "list".  
 
 ## Numbering
 
-Numbering records by subgroup of another variable is done with **DT[,number:=1:.N,by=group_variable]**
+Numbering records by subgroup of another variable is done with **DT[,number:=1:.N, by=group_variable]**
 
-Numbering groups, that is numbering all levels of one variable, is done with **DT[group_number:=1:.GRP,by=group_variable]**
+Numbering groups, that is numbering all levels of one variable, is done with **DT[group_number:=1:.GRP, by=group_variable]**
 
 ## Make multiple records
 For some counting purposes it may be a good idea to create multiple records for levels of a selected variable:
@@ -230,7 +230,41 @@ The function **heaven::charlsonIndex** can provide Charlson Index and individual
 ## Hypertension
 The function **heaven::hypertensionMedication** can define the presence of hypertension using medication used for treating hypertension. The function can provide either the presence of hypertension at a specific date or the date at which hypertension appears.
 
-# 
+# Demographic tables
+A key for any publication is presentation of the population, most often a range of characteristics subgrouped by exposure or outcome of interest. Such tables can be made in a single step with functions from the **table1** package or with the **Publish::univariateTable** function.  The **Publish::summary(univariateTable)** function can be abbreviated with **Publish::sutable**
+
+# Survival analysis
+## Univariate and stratified analysis
+Cumulative incidence and Kaplan meier analysis can be obtained with a range of function, with our favorite being **prodlim::prodlim**. For practical use of this (and other functions) it is important to understand some general rules of function creation:
+* The immediate product of this function and regression function is an "object" with is a list of all sorts of varied information that the programmer considers useful for use.  It is for very special purpose that this object needs to be interrogated.
+* Just producing the object without assigning it to a new object will in general result in execution of the **summary.prodlim** function which tabulates a summary useful for many purposes.
+* Most such objects also have a plot function which in this case following a convention is names **plot.prodlim**. Each of these standard functions have their own options for adjusting the output. If you need to adjust the plot.prodlim function it is not helpful to interrogate the **help(prodlim)** page, but rather the **help(plot.prodlim)** page.
+
+## Regression
+The **survival::coxph** function is the choise for Cox regression and the **glm** function is the choise for logistic regression and Poisson regression.
+
+The simple summary function is not useful for publication ready output from these function, but the **Publish::regressionTable** function provides useful tables. A simplistic forest plot can be made with **Publish::plot(regressionTable)** and more flexible tabulation beside the plot with **Publish::plotConficense** function.  Advanced tables and plots can be created within the rich environment of **ggplot2**.
+
+It is common not only to present an overall analysis, but also a range of subgroups by selected variables. Tables and plots of such subgroups can be made with the **Publish::subgroupAnalysis** function.
+
+# Looping analyses
+It is common to present the results of multiple outcomes with and without multiple subgroups in a single table. In such situations it is much faster and much more transparent to create the multiple results in a loop rather than as separate programming blocks. To understand an efficient way of producing such analyses we need to introduce two function:
+* **lapply** is a strong looping function that requires two arguments, a **list** and a **function**.  The function will consecutively apply the function to each element of the list and produce a list object containing the results of the function evaluation.
+* The final list elements of the lapply function are for practical use data.tables (or data.frames) - and these can be aggregated into a single data.table object with **data.table::rbindList**
+
+Example:
+```{r}
+library(data.table)
+DT <- data.table(ID=c(1:3),number=c(1,2,3),number2=c(8,9,10))
+rbindlist(lapply(DT[,number],function(x){ # the function being defined right here
+  data.table(PTID=DT[ID==x,ID],output=DT[ID==x,number2]*x) # Illustrative nonsense calculation
+  # The last statement of a function is what is output
+}))
+
+```
+
+
+
 
 
 
