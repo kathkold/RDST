@@ -1,6 +1,6 @@
 ---
 title: "R on DST"
-subtitle: "Tieps for efficient use of R on Statistics Denmark"
+subtitle: "Tips for efficient use of R on Statistics Denmark"
 author:
 - Christian Torp-Pedersen
 - Kathrine Kold Sørensen
